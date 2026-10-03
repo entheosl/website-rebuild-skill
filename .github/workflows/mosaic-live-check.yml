@@ -34,7 +34,7 @@ jobs:
           mkdir -p /tmp/live-report
           cat > /tmp/live-browser/test.cjs <<'JS'
           const {chromium}=require('playwright');
-          const fs=require('fs'),crypto=require('crypto');
+          const fs=require('fs');
           const base='https://entheosl.github.io/website-rebuild-skill/demos/agent-runtime/';
           const expected=fs.readFileSync(process.env.SOURCE_DIR+'/demos/agent-runtime/index.html','utf8').replace(/\r/g,'').trim();
           const report={url:base,commit:process.env.GITHUB_SHA,checks:[],errors:[]};
@@ -54,7 +54,7 @@ jobs:
               page.on('pageerror',e=>report.errors.push(e.message));
               page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
               await page.goto(base+'?verified='+process.env.GITHUB_SHA,{waitUntil:'networkidle'});
-              await page.waitForFunction(()=>window.__mosaicTest?.stats().ready,{},{timeout:60000});
+              await page.waitForFunction(()=>window.__mosaicTest?.stats().ready,null,{timeout:60000});
               await page.locator('#finish').click();
               const finished=await page.evaluate(()=>window.__mosaicTest.stats());
               if(finished.time!==24||!finished.webgl2||finished.tileCount<1500)throw Error('Invalid final Three.js scene');
@@ -66,10 +66,15 @@ jobs:
               const after=await page.locator('#stage canvas').screenshot();
               if(before.equals(after))throw Error('Camera drag did not change rendered pixels');
               await page.screenshot({path:`/tmp/live-report/${viewport.width}x${viewport.height}-rotated.png`});
-              await page.locator('#replay').click();await page.waitForTimeout(1000);
+              await page.locator('#replay').click();
+              await page.waitForFunction(()=>{const t=window.__mosaicTest.stats().time;return t>0&&t<5;},null,{timeout:30000});
               const replay=await page.evaluate(()=>window.__mosaicTest.stats());
-              if(!(replay.time>0&&replay.time<5))throw Error('Replay failed');
-              report.checks.push({viewport,finished,dragChangedPixels:true,replay:replay.time});
+              await page.locator('#play').click();
+              const pausedAt=await page.evaluate(()=>window.__mosaicTest.stats().time);
+              await page.waitForTimeout(500);
+              const later=await page.evaluate(()=>window.__mosaicTest.stats().time);
+              if(later!==pausedAt)throw Error('Pause did not stop animation time');
+              report.checks.push({viewport,finished,dragChangedPixels:true,replay:replay.time,pauseStable:true});
               await page.close();
             }
             await browser.close();
