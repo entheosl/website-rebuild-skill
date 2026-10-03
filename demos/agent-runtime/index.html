@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Agent Core — Inside the Runtime</title>
+<style>
+:root{--bg:#02050b;--text:#eaf7ff}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 45%,rgba(48,130,255,.10),transparent 28%),radial-gradient(circle at 72% 26%,rgba(156,94,255,.08),transparent 24%),linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:auto,auto,42px 42px,42px 42px;mix-blend-mode:screen}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at center,transparent 40%,rgba(0,0,0,.18) 68%,rgba(0,0,0,.72) 100%)}
+.hud{position:fixed;inset:0;pointer-events:none;padding:22px;display:flex;flex-direction:column;justify-content:space-between}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.brand{max-width:560px}
+.eyebrow{letter-spacing:.22em;text-transform:uppercase;font-size:10px;color:#70e7ff;opacity:.86;display:flex;gap:10px;align-items:center}
+.dot{width:6px;height:6px;border-radius:50%;background:#70e7ff;box-shadow:0 0 14px #70e7ff;animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{50%{opacity:.35;transform:scale(.75)}}
+h1{font-size:clamp(26px,8vw,56px);line-height:.95;margin:13px 0 9px;font-weight:700;letter-spacing:-.04em}.sub{font-size:12px;color:#8fa6ba;max-width:520px;line-height:1.6}
+.bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}.legend{display:grid;grid-template-columns:repeat(2,minmax(90px,1fr));gap:8px;width:min(560px,78vw)}
+.chip{padding:9px 10px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(2,10,18,.5);backdrop-filter:blur(14px);font-size:9px;color:#95aabd;transition:.25s}
+.chip strong{display:block;color:#eefaff;font-size:11px;margin-bottom:3px}.chip.active{border-color:rgba(84,226,255,.42);box-shadow:0 0 30px rgba(57,210,255,.12) inset,0 0 30px rgba(57,210,255,.06)}
+.center-title{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;opacity:0;filter:blur(14px);transition:.5s ease}.center-title.show{opacity:1;filter:blur(0)}
+.center-title .k{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:#73e9ff}.center-title .t{font-size:clamp(22px,7vw,42px);font-weight:650;letter-spacing:-.03em;margin-top:8px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas><div class="vignette"></div>
+<div class="hud">
+<div class="top"><div class="brand"><div class="eyebrow"><span class="dot"></span>AGENT RUNTIME / LIVE TRACE</div><h1>Inside the Runtime</h1><div class="sub">Prompt → Planner → Tool Registry → PostgreSQL → Evidence → Synthesis. 拖动屏幕改变视角，点击瞬间加速。</div></div></div>
+<div class="bottom"><div class="legend"><div class="chip active"><strong>01 Prompt</strong>User intent</div><div class="chip"><strong>02 Planner</strong>agent_plan</div><div class="chip"><strong>03 Tools</strong>Capability</div><div class="chip"><strong>04 Evidence</strong>Synthesis</div></div></div>
+</div>
+<div class="center-title" id="centerTitle"><div class="k" id="centerK">PLANNER</div><div class="t" id="centerT">Structured Intent</div></div>
+<script>
+(()=>{const canvas=document.getElementById('c'),ctx=canvas.getContext('2d',{alpha:false});let W=0,H=0,DPR=1;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(DPR,0,0,DPR,0,0)}
+addEventListener('resize',resize);resize();
+const mouse={x:0,y:0,tx:0,ty:0};
+addEventListener('pointermove',e=>{mouse.tx=(e.clientX/W-.5)*2;mouse.ty=(e.clientY/H-.5)*2});
+let speed=1,boost=0;addEventListener('pointerdown',()=>boost=1.8);
+const rand=(a,b)=>a+Math.random()*(b-a),particles=[];const N=Math.min(900,Math.floor((W*H)/900));
+for(let i=0;i<N;i++)particles.push({x:rand(-1.25,1.25),y:rand(-.9,.9),z:rand(.05,1),s:rand(.3,1.6),a:rand(.12,.8),hue:Math.random()<.12?275:190});
+const nodes=[{name:'PROMPT',label:'User Intent',z:.04,x:-.18,y:.08,kind:0},{name:'PLANNER',label:'Structured Intent',z:.26,x:.23,y:-.12,kind:1},{name:'TOOL REGISTRY',label:'Capability Snapshot',z:.49,x:-.22,y:.13,kind:2},{name:'POSTGRESQL',label:'Query / Mutation',z:.70,x:.26,y:.08,kind:3},{name:'EVIDENCE',label:'Normalized Context',z:.84,x:-.1,y:-.16,kind:4},{name:'SYNTHESIS',label:'Final Answer',z:.96,x:.05,y:.03,kind:5}];
+const palette=[[72,230,255],[154,124,255],[97,255,179],[80,170,255],[92,240,217],[255,255,255]];
+let t0=performance.now(),travel=0;
+function project(x,y,z){const depth=Math.max(.045,z),f=1/depth;return{x:W*.5+(x+mouse.x*.08*(1-depth))*W*.34*f,y:H*.5+(y+mouse.y*.06*(1-depth))*H*.34*f,f}}
+function drawNode(n,z,active){const p=project(n.x,n.y,z);if(p.x<-500||p.x>W+500||p.y<-400||p.y>H+400)return;const[r,g,b]=palette[n.kind],s=Math.min(3.5,p.f),w=130*s,h=64*s,alpha=Math.max(0,Math.min(1,(1-z)*2.4))*Math.min(1,z*7);ctx.save();ctx.globalAlpha=alpha;
+const grd=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,w*.85);grd.addColorStop(0,`rgba(${r},${g},${b},${active?.16:.07})`);grd.addColorStop(1,`rgba(${r},${g},${b},0)`);ctx.fillStyle=grd;ctx.fillRect(p.x-w,p.y-w,w*2,w*2);
+ctx.strokeStyle=`rgba(${r},${g},${b},${active?.35:.12})`;ctx.lineWidth=Math.max(.5,1.2*s);for(let k=0;k<3;k++){ctx.beginPath();ctx.ellipse(p.x,p.y,w*(.54+k*.13),h*(.95+k*.22),0,0,Math.PI*2);ctx.stroke()}
+ctx.beginPath();ctx.roundRect(p.x-w*.5,p.y-h*.5,w,h,Math.min(22,12*s));ctx.fillStyle=`rgba(${r},${g},${b},.06)`;ctx.fill();ctx.strokeStyle=`rgba(${r},${g},${b},${active?.72:.32})`;ctx.stroke();
+ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor=`rgba(${r},${g},${b},.55)`;ctx.shadowBlur=active?18:8;ctx.fillStyle='rgba(239,250,255,.96)';ctx.font=`${Math.max(9,12*s)}px ui-monospace,monospace`;ctx.fillText(n.name,p.x,p.y-6*s);ctx.shadowBlur=0;ctx.fillStyle=`rgba(${r},${g},${b},.78)`;ctx.font=`${Math.max(7,8*s)}px ui-monospace,monospace`;ctx.fillText(n.label,p.x,p.y+11*s);ctx.restore()}
+function draw(){const now=performance.now(),dt=Math.min(.032,(now-t0)/1000);t0=now;mouse.x+=(mouse.tx-mouse.x)*.06;mouse.y+=(mouse.ty-mouse.y)*.06;boost*=.93;travel+=dt*(.055*speed+.045*boost);ctx.fillStyle='#02050b';ctx.fillRect(0,0,W,H);
+const neb=ctx.createRadialGradient(W*.52+mouse.x*40,H*.46+mouse.y*28,0,W*.52,H*.46,Math.max(W,H)*.65);neb.addColorStop(0,'rgba(30,98,160,.11)');neb.addColorStop(.35,'rgba(24,48,95,.055)');neb.addColorStop(1,'rgba(2,5,11,0)');ctx.fillStyle=neb;ctx.fillRect(0,0,W,H);
+ctx.save();ctx.globalCompositeOperation='lighter';for(const p of particles){let z=(p.z-travel*1.08)%1;if(z<0)z+=1;z=.045+z*.955;const pp=project(p.x,p.y,z),a=p.a*Math.min(1,(1-z)*1.6+.12),len=(speed+boost)*Math.min(18,4/(z*z)),prev=project(p.x,p.y,Math.min(1,z+.012*len));ctx.strokeStyle=`hsla(${p.hue},95%,72%,${a*.55})`;ctx.lineWidth=Math.max(.3,p.s*Math.min(2.1,1/z)*.48);ctx.beginPath();ctx.moveTo(pp.x,pp.y);ctx.lineTo(prev.x,prev.y);ctx.stroke()}ctx.restore();
+const local=nodes.map(n=>{let z=(n.z-travel*.55)%1;if(z<0)z+=1;return{...n,z:.07+z*.90}});
+local.sort((a,b)=>b.z-a.z).forEach(n=>drawNode(n,n.z,Math.abs(n.z-.23)<.07));
+const active=local.reduce((a,n)=>Math.abs(n.z-.23)<Math.abs(a.z-.23)?n:a,local[0]),title=document.getElementById('centerTitle');
+if(Math.abs(active.z-.23)<.055){centerK.textContent=active.name;centerT.textContent=active.label;title.classList.add('show')}else title.classList.remove('show');
+const chips=[...document.querySelectorAll('.chip')],stage=active.kind<=1?active.kind:active.kind<=3?2:3;chips.forEach((c,i)=>c.classList.toggle('active',i===stage));requestAnimationFrame(draw)}
+requestAnimationFrame(draw)})();
+</script>
+</body></html>
