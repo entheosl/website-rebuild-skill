@@ -26,7 +26,7 @@ jobs:
           root=Path('/tmp/pbr-bundle/raw')
           manifest=[]
           def get(url):
-              req=urllib.request.Request(url,headers={'User-Agent':'MosaicMaterialPreview/1.0 (personal non-commercial demo)'})
+              req=urllib.request.Request(url,headers={'User-Agent':'MosaicMaterialPreview/1.0'})
               with urllib.request.urlopen(req, timeout=90) as r:return r.read()
           def save(url,name,source):
               b=get(url);(root/name).write_bytes(b)
@@ -42,9 +42,11 @@ jobs:
           for asset in ['beige_wall_001','wood_table_001']:
               meta=json.loads(get('https://api.polyhaven.com/files/'+asset))
               (root/(asset+'-api.json')).write_text(json.dumps(meta))
-              for key in ['diff','nor_gl','rough']:
+              print(asset,list(meta.keys()),flush=True)
+              for output,aliases in [('diff',['diff','Diffuse','diffuse','albedo']),('nor_gl',['nor_gl','Normal','normal']),('rough',['rough','Rough','roughness'])]:
+                  key=next(k for k in aliases if k in meta)
                   f=meta[key]['2k']['jpg']
-                  jobs.append((f['url'],asset+'_'+key+'.jpg','https://polyhaven.com/a/'+asset))
+                  jobs.append((f['url'],asset+'_'+output+'.jpg','https://polyhaven.com/a/'+asset))
           meta=json.loads(get('https://api.polyhaven.com/files/studio_small_09'))
           jobs.append((meta['hdri']['1k']['hdr']['url'],'studio_small_09_1k.hdr','https://polyhaven.com/a/studio_small_09'))
           with ThreadPoolExecutor(max_workers=3) as pool:
@@ -57,6 +59,7 @@ jobs:
           npm install --ignore-scripts --no-audit --no-fund three@0.170.0 >/dev/null
           sed "s/from 'three'/from '.\/three.module.min.js'/" node_modules/three/examples/jsm/loaders/RGBELoader.js > /tmp/pbr-bundle/demo/vendor/RGBELoader.js
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: mosaic-pbr-source-bundle
           path: /tmp/pbr-bundle/
