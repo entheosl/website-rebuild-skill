@@ -27,6 +27,7 @@ jobs:
           python3 -m pip install --quiet Pillow==11.3.0 numpy==2.2.6
           python3 tools/mosaic-pbr/build_materials.py
           python3 tools/mosaic-pbr/patch_scene.py
+          python3 tools/mosaic-pbr/preserve_artwork.py
           mkdir -p /tmp/pbr-test
           cd /tmp/pbr-test
           npm init -y >/dev/null
@@ -55,7 +56,7 @@ jobs:
                 await page.screenshot({path:`/tmp/pbr-check/${viewport.width}x${viewport.height}-${t}.png`});
               }
               const stats=await page.evaluate(()=>window.__mosaicTest.stats());
-              if(stats.build!=='mosaic-pbr-r3'||stats.materials.type!=='MeshPhysicalMaterial'||!stats.materials.environment||stats.materials.maps.length!==8)throw Error('Material readiness failed');
+              if(stats.build!=='mosaic-pbr-r3'||stats.materials.type!=='MeshPhysicalMaterial'||!stats.materials.environment||stats.materials.maps.length!==8||stats.artworkCleanup!=='contour-preserving-median')throw Error('Material readiness failed');
               if(stats.tileCount<4000||stats.time!==24||failures.length)throw Error('Scene or resource validation failed');
               const before=await page.locator('#stage canvas').screenshot();
               await page.mouse.move(viewport.width*.5,viewport.height*.5);await page.mouse.down();
