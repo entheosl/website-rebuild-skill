@@ -1,0 +1,63 @@
+name: Mosaic material sources
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/mosaic-material-sources.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download official CC0 source assets without changing the public demo
+        run: |
+          mkdir -p /tmp/pbr-bundle/raw
+          cp -R demos/agent-runtime /tmp/pbr-bundle/demo
+          python3 - <<'PY'
+          import urllib.request, json, hashlib, zipfile, io
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor
+          root=Path('/tmp/pbr-bundle/raw')
+          manifest=[]
+          def get(url):
+              req=urllib.request.Request(url,headers={'User-Agent':'MosaicMaterialPreview/1.0 (personal non-commercial demo)'})
+              with urllib.request.urlopen(req, timeout=90) as r:return r.read()
+          def save(url,name,source):
+              b=get(url);(root/name).write_bytes(b)
+              manifest.append({'file':name,'url':url,'source':source,'license':'CC0-1.0','bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()})
+              print(name,len(b),flush=True)
+          archive=get('https://ambientcg.com/get?file=Tiles107_4K-JPG.zip')
+          manifest.append({'file':'Tiles107_4K-JPG.zip','url':'https://ambientcg.com/get?file=Tiles107_4K-JPG.zip','source':'https://ambientcg.com/view?id=Tiles107','license':'CC0-1.0','bytes':len(archive),'sha256':hashlib.sha256(archive).hexdigest()})
+          with zipfile.ZipFile(io.BytesIO(archive)) as z:
+              for name in z.namelist():
+                  if any(name.endswith('_'+m+'.jpg') for m in ['Color','NormalGL','Roughness','Displacement']):
+                      (root/Path(name).name).write_bytes(z.read(name));print(name,flush=True)
+          jobs=[]
+          for asset in ['beige_wall_001','wood_table_001']:
+              meta=json.loads(get('https://api.polyhaven.com/files/'+asset))
+              (root/(asset+'-api.json')).write_text(json.dumps(meta))
+              for key in ['diff','nor_gl','rough']:
+                  f=meta[key]['2k']['jpg']
+                  jobs.append((f['url'],asset+'_'+key+'.jpg','https://polyhaven.com/a/'+asset))
+          meta=json.loads(get('https://api.polyhaven.com/files/studio_small_09'))
+          jobs.append((meta['hdri']['1k']['hdr']['url'],'studio_small_09_1k.hdr','https://polyhaven.com/a/studio_small_09'))
+          with ThreadPoolExecutor(max_workers=3) as pool:
+              list(pool.map(lambda a:save(*a),jobs))
+          (root/'sources.json').write_text(json.dumps(manifest,indent=2))
+          PY
+          mkdir -p /tmp/pbr-npm
+          cd /tmp/pbr-npm
+          npm init -y >/dev/null
+          npm install --ignore-scripts --no-audit --no-fund three@0.170.0 >/dev/null
+          sed "s/from 'three'/from '.\/three.module.min.js'/" node_modules/three/examples/jsm/loaders/RGBELoader.js > /tmp/pbr-bundle/demo/vendor/RGBELoader.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mosaic-pbr-source-bundle
+          path: /tmp/pbr-bundle/
+          retention-days: 3
