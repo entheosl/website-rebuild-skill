@@ -1,0 +1,86 @@
+name: Mosaic live smoke test
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'demos/agent-runtime/index.html'
+      - '.github/workflows/mosaic-live-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mosaic-live-check
+  cancel-in-progress: true
+jobs:
+  public-page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser
+        run: |
+          mkdir -p /tmp/live-browser
+          cd /tmp/live-browser
+          npm init -y
+          npm install --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test real public HTTPS URL
+        env:
+          SOURCE_DIR: ${{ github.workspace }}
+        run: |
+          mkdir -p /tmp/live-report
+          cat > /tmp/live-browser/test.cjs <<'JS'
+          const {chromium}=require('playwright');
+          const fs=require('fs'),crypto=require('crypto');
+          const base='https://entheosl.github.io/website-rebuild-skill/demos/agent-runtime/';
+          const expected=fs.readFileSync(process.env.SOURCE_DIR+'/demos/agent-runtime/index.html','utf8').replace(/\r/g,'').trim();
+          const report={url:base,commit:process.env.GITHUB_SHA,checks:[],errors:[]};
+          (async()=>{
+            let fresh=false;
+            for(let n=0;n<24;n++){
+              const r=await fetch(base+'?check='+Date.now());
+              const html=await r.text();
+              report.httpStatus=r.status;
+              if(r.ok&&html.replace(/\r/g,'').trim()===expected){fresh=true;break;}
+              await new Promise(r=>setTimeout(r,5000));
+            }
+            if(!fresh)throw Error('GitHub Pages did not publish the expected HTML within 120 seconds');
+            const browser=await chromium.launch({args:['--no-sandbox','--enable-webgl','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+            for(const viewport of [{width:390,height:844},{width:844,height:390},{width:1280,height:900}]){
+              const page=await browser.newPage({viewport,isMobile:viewport.width<900,hasTouch:true,deviceScaleFactor:1});
+              page.on('pageerror',e=>report.errors.push(e.message));
+              page.on('console',m=>{if(m.type()==='error')report.errors.push(m.text());});
+              await page.goto(base+'?verified='+process.env.GITHUB_SHA,{waitUntil:'networkidle'});
+              await page.waitForFunction(()=>window.__mosaicTest?.stats().ready,{},{timeout:60000});
+              await page.locator('#finish').click();
+              const finished=await page.evaluate(()=>window.__mosaicTest.stats());
+              if(finished.time!==24||!finished.webgl2||finished.tileCount<1500)throw Error('Invalid final Three.js scene');
+              await page.screenshot({path:`/tmp/live-report/${viewport.width}x${viewport.height}-final.png`});
+              const before=await page.locator('#stage canvas').screenshot();
+              await page.mouse.move(viewport.width*.5,viewport.height*.5);
+              await page.mouse.down();await page.mouse.move(viewport.width*.67,viewport.height*.45,{steps:5});await page.mouse.up();
+              await page.waitForTimeout(500);
+              const after=await page.locator('#stage canvas').screenshot();
+              if(before.equals(after))throw Error('Camera drag did not change rendered pixels');
+              await page.screenshot({path:`/tmp/live-report/${viewport.width}x${viewport.height}-rotated.png`});
+              await page.locator('#replay').click();await page.waitForTimeout(1000);
+              const replay=await page.evaluate(()=>window.__mosaicTest.stats());
+              if(!(replay.time>0&&replay.time<5))throw Error('Replay failed');
+              report.checks.push({viewport,finished,dragChangedPixels:true,replay:replay.time});
+              await page.close();
+            }
+            await browser.close();
+            fs.writeFileSync('/tmp/live-report/report.json',JSON.stringify(report,null,2));
+            if(report.errors.length)throw Error(report.errors.join('\n'));
+          })().catch(e=>{report.errors.push(e.message);fs.writeFileSync('/tmp/live-report/report.json',JSON.stringify(report,null,2));console.error(e);process.exit(1);});
+          JS
+          node /tmp/live-browser/test.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mosaic-live-verified
+          path: /tmp/live-report/
+          retention-days: 7
