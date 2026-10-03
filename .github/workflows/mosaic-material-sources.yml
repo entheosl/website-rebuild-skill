@@ -12,7 +12,7 @@ concurrency:
   group: mosaic-pbr-materials
   cancel-in-progress: true
 env:
-  PUBLISH: 'false'
+  PUBLISH: 'true'
 jobs:
   surfaces:
     runs-on: ubuntu-latest
