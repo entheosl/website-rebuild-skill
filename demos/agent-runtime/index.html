@@ -4,14 +4,14 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#d1c3a9"><meta name="description" content="Three.js tesserae reconstruction from the supplied mosaic reference. Real 3D geometry, no video playback.">
 <link rel="icon" href="data:,">
-<title>陶片成画 · Three.js</title>
+<title>陶片成画 · PBR 釉面</title>
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#342e25;background:#c9baa1;font-synthesis:none}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden}#stage{position:fixed;inset:0;touch-action:none}canvas{display:block;width:100%;height:100%}.head{position:fixed;top:max(22px,env(safe-area-inset-top));left:max(24px,env(safe-area-inset-left));pointer-events:none;text-shadow:0 1px 14px #fff9}.eyebrow{font-size:9px;letter-spacing:.2em;font-weight:650;opacity:.65}.head h1{font-weight:500;font-size:23px;letter-spacing:.13em;margin:7px 0}.status{position:fixed;right:max(24px,env(safe-area-inset-right));top:max(25px,env(safe-area-inset-top));font-size:10px;letter-spacing:.08em;pointer-events:none;background:#eee4ceaa;padding:7px 10px;border:1px solid #fff5;border-radius:20px}.status:before{content:"";display:inline-block;width:5px;height:5px;background:#667c62;border-radius:50%;margin-right:7px}.controls{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(460px,calc(100% - 32px));padding:14px 17px 12px;border-radius:18px;border:1px solid #fff6;background:#f4eadbdc;box-shadow:0 8px 36px #382a181c;backdrop-filter:blur(16px)}.time-row{display:flex;align-items:center;gap:12px;font-size:10px;font-variant-numeric:tabular-nums;color:#6f6454}input[type=range]{flex:1;min-width:0;height:20px;accent-color:#8c553f;cursor:pointer}.buttons{display:flex;align-items:center;gap:6px;margin-top:5px}button{border:0;background:transparent;padding:9px 12px;color:inherit;font:inherit;font-size:12px;border-radius:10px;cursor:pointer;touch-action:manipulation}button:active{background:#91744c22}button.primary{background:#67543e;color:#fff7e8}.help{font-size:10px;opacity:.6;margin-left:auto;white-space:nowrap}#loading{position:fixed;inset:0;display:grid;place-content:center;text-align:center;background:#d3c5ad;z-index:5;transition:opacity .4s}#loading.done{opacity:0;pointer-events:none}#loading b{font-size:22px;font-weight:500;letter-spacing:.12em}#loading p{font-size:12px;color:#6f6453;max-width:300px;line-height:1.8}#loading .retry{display:none;background:#67543e;color:white;margin:auto}#loading.error .retry{display:block}.spinner{width:28px;height:28px;margin:0 auto 24px;border:2px solid #6b513325;border-top-color:#6b5133;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(max-height:500px){.head{top:14px;left:18px}.head h1{font-size:18px}.status{top:16px;right:18px}.controls{bottom:10px;padding:5px 12px;width:min(360px,calc(100% - 32px));border-radius:13px}.buttons{margin-top:0}button{padding:5px 10px}.help{display:none}}@media(max-width:420px){.head{left:20px}.status{right:18px;font-size:9px}.controls{padding:10px 12px}.help{font-size:9px}button{padding:9px 10px}}@media(prefers-reduced-motion:reduce){.spinner{animation:none}}
 </style>
 </head>
 <body>
 <div id="stage" aria-label="可拖动旋转的三维马赛克"></div>
-<header class="head"><div class="eyebrow">TESSERAE / THREE.JS</div><h1>陶片成画</h1></header><div class="status" id="status">建立三维场景</div>
+<header class="head"><div class="eyebrow">TESSERAE / PBR GLAZE</div><h1>陶片成画</h1></header><div class="status" id="status">建立三维场景</div>
 <div class="controls"><div class="time-row"><span id="time">00.0</span><input id="timeline" type="range" min="0" max="24" step="0.02" value="0" aria-label="动画时间"><span>24.0</span></div><div class="buttons"><button id="play" class="primary" aria-label="暂停">暂停</button><button id="replay">重播</button><button id="finish">看成品</button><span class="help">单指旋转 · 双指缩放</span></div></div>
 <div id="loading"><div class="spinner"></div><b>一片一片，重新成画。</b><p id="loadtext">正在载入 Three.js 与原画面纹理…</p><button class="retry" onclick="location.reload()">重新加载</button></div>
 <noscript>请启用 JavaScript，才能查看三维瓷砖动画。</noscript>
@@ -72,35 +72,68 @@ try{
   if(y>.73)return 14.2+(y-.73)*6.7+x*.9+s*.6;
   return 15.4+(Math.sin(x*8+y*2)+1)*.45+(1-y)*1.25+s*.5;
  }
- const position=[],normal=[],uv=[],shade=[],centers=[],motions=[],tiles=[];
- function triangle(a,b,c,uvA,uvB,uvC,center,motion,tint){const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]],n=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]],len=Math.hypot(...n)||1;for(let k=0;k<3;k++)n[k]/=len;for(const p of [a,b,c]){position.push(...p);normal.push(...n);shade.push(tint,tint,tint);centers.push(...center);motions.push(...motion);}uv.push(...uvA,...uvB,...uvC);}
+ const position=[],normal=[],uv=[],surfaceUV=[],shade=[],centers=[],motions=[],tiles=[];
+ let activeBounds=[0,0,1,1];
+ function triangle(a,b,c,uvA,uvB,uvC,center,motion,tint){const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]],n=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]],len=Math.hypot(...n)||1;for(let k=0;k<3;k++)n[k]/=len;for(const p of [a,b,c]){position.push(...p);normal.push(...n);shade.push(tint,tint,tint);surfaceUV.push((p[0]-activeBounds[0])/activeBounds[2],1-(p[2]-activeBounds[1])/activeBounds[3]);centers.push(...center);motions.push(...motion);}uv.push(...uvA,...uvB,...uvC);}
  for(let k=0;k<cells.length;k++){
   let p=hull(cells[k]);if(p.length<3)continue;
   let cx=0,cy=0;for(const v of p){cx+=v[0];cy+=v[1];}cx/=p.length;cy/=p.length;
   let area=0;for(let j=0;j<p.length;j++)area+=p[j][0]*p[(j+1)%p.length][1]-p[(j+1)%p.length][0]*p[j][1];if(Math.abs(area)<3)continue;
-  const s=random(k),s2=random(k+534),s3=random(k+1753),height=.047+s*.027,center=[(cx/N-.5)*10,0,(cy/N-.5)*10,arrival(cx/N,cy/N,k)],motion=[s,s2,s3,.54+s2*.44],C=[center[0],height,center[2]],UC=[cx/N,1-cy/N];
+  const minX=Math.min(...p.map(v=>v[0])),maxX=Math.max(...p.map(v=>v[0])),minY=Math.min(...p.map(v=>v[1])),maxY=Math.max(...p.map(v=>v[1]));
+  activeBounds=[(minX/N-.5)*10,(minY/N-.5)*10,Math.max(.001,(maxX-minX)/N*10),Math.max(.001,(maxY-minY)/N*10)];
+  const s=random(k),s2=random(k+534),s3=random(k+1753),height=.047+s*.012,center=[(cx/N-.5)*10,0,(cy/N-.5)*10,arrival(cx/N,cy/N,k)],motion=[s,s2,s3,.54+s2*.44],C=[center[0],height,center[2]],UC=[cx/N,1-cy/N];
   const points=p.map(v=>{const dx=v[0]-cx,dy=v[1]-cy,l=Math.hypot(dx,dy),q=Math.max(.6,1-.17/Math.max(1,l));return[cx+dx*q,cy+dy*q];});
-  const bottom=points.map(v=>[(v[0]/N-.5)*10,.006,(v[1]/N-.5)*10]),rim=bottom.map(v=>[v[0],height-.012,v[2]]),top=points.map(v=>[center[0]+(v[0]/N*10-5-center[0])*.92,height,center[2]+(v[1]/N*10-5-center[2])*.92]);
+  const bottom=points.map(v=>[(v[0]/N-.5)*10,.006,(v[1]/N-.5)*10]),rim=bottom.map(v=>[v[0],height-.009,v[2]]),top=points.map(v=>[center[0]+(v[0]/N*10-5-center[0])*.96,height,center[2]+(v[1]/N*10-5-center[2])*.96]);
   const uvs=points.map(v=>[v[0]/N,1-v[1]/N]);
   for(let j=0;j<p.length;j++){const j2=(j+1)%p.length;triangle(C,top[j2],top[j],UC,uvs[j2],uvs[j],center,motion,1);triangle(top[j],rim[j2],rim[j],uvs[j],uvs[j2],uvs[j],center,motion,.98);triangle(top[j],top[j2],rim[j2],uvs[j],uvs[j2],uvs[j2],center,motion,.98);triangle(rim[j],bottom[j2],bottom[j],UC,UC,UC,center,motion,.91);triangle(rim[j],rim[j2],bottom[j2],UC,UC,UC,center,motion,.91);}
   tiles.push({x:cx/N,y:cy/N,delay:center[3],duration:motion[3]});
  }
  loadtext.textContent='正在编译光照、陶片运动与投影…';await new Promise(r=>setTimeout(r,32));
- const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.65;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('#stage').appendChild(renderer.domElement);
- const scene=new THREE.Scene();scene.background=new THREE.Color('#9a8770');scene.fog=new THREE.Fog('#9a8770',30,75);
- const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.03,100);scene.add(new THREE.HemisphereLight('#fff9ef','#595147',1.1));
- const sun=new THREE.DirectionalLight('#fff9ed',2.6);sun.position.set(-5,9,-5);sun.castShadow=true;sun.shadow.mapSize.set(innerWidth<900?1024:2048,innerWidth<900?1024:2048);sun.shadow.camera.left=-8;sun.shadow.camera.right=8;sun.shadow.camera.top=8;sun.shadow.camera.bottom=-8;sun.shadow.camera.near=.5;sun.shadow.camera.far=32;sun.shadow.bias=-.00015;sun.shadow.normalBias=.004;sun.shadow.radius=2;scene.add(sun);
- // Plaster substrate and separate wooden frame; the picture consists of real 3D tesserae.
- const sand=document.createElement('canvas');sand.width=sand.height=512;const sandCtx=sand.getContext('2d'),sandData=sandCtx.createImageData(512,512);for(let i=0;i<512*512;i++){const noise=(random(i+31)-.5)*35+(random((i/8)|0)-.5)*8;sandData.data[i*4]=183+noise;sandData.data[i*4+1]=168+noise;sandData.data[i*4+2]=143+noise;sandData.data[i*4+3]=255;}sandCtx.putImageData(sandData,0,0);const sandMap=new THREE.CanvasTexture(sand);sandMap.colorSpace=THREE.SRGBColorSpace;sandMap.wrapS=sandMap.wrapT=THREE.RepeatWrapping;sandMap.repeat.set(1.5,1.5);
- const baseMat=new THREE.MeshStandardMaterial({map:sandMap,bumpMap:sandMap,bumpScale:.065,roughness:.98});const board=new THREE.Mesh(new THREE.BoxGeometry(10.5,.22,10.5),baseMat);board.position.y=-.11;board.receiveShadow=true;scene.add(board);
- const floor=new THREE.Mesh(new THREE.PlaneGeometry(160,160),new THREE.MeshStandardMaterial({color:'#84715a',roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-.34;floor.receiveShadow=true;scene.add(floor);
- const wood=new THREE.MeshStandardMaterial({color:'#91806a',roughness:.9});for(let i=0;i<4;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(i<2?10.84:.16,.25,i<2?.16:10.84),wood);m.position.set(i<2?0:(i===2?-5.34:5.34),-.045,i<2?(i===0?-5.34:5.34):0);m.castShadow=m.receiveShadow=true;scene.add(m);}
+ const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.85;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('#stage').appendChild(renderer.domElement);
+ const scene=new THREE.Scene();scene.background=new THREE.Color('#b9ae9b');scene.fog=new THREE.Fog('#b9ae9b',30,75);
+ const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.03,100);scene.add(new THREE.HemisphereLight('#fffaf3','#7d766b',.40));
+ const sun=new THREE.DirectionalLight('#fff9ed',1.65);sun.position.set(-5,9,-5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-8;sun.shadow.camera.right=8;sun.shadow.camera.top=8;sun.shadow.camera.bottom=-8;sun.shadow.camera.near=.5;sun.shadow.camera.far=32;sun.shadow.bias=-.00015;sun.shadow.normalBias=.004;sun.shadow.radius=2;scene.add(sun);
+ // Official CC0 ceramic/plaster/wood PBR data; all assets are on this same origin.
+ loadtext.textContent='正在载入釉面、灰泥、木纹与摄影棚光照…';
+ const loader=new THREE.TextureLoader(),assetURL=new URL('./assets/pbr/',import.meta.url);
+ const anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()),loadedPBR=[];
+ async function readMap(name,color=false,repeat=[1,1]){
+  let timer;
+  const t=await Promise.race([loader.loadAsync(new URL(name,assetURL).href),new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('PBR texture timeout: '+name)),30000))]).finally(()=>clearTimeout(timer));
+  t.colorSpace=color?THREE.SRGBColorSpace:THREE.NoColorSpace;
+  t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(...repeat);t.anisotropy=anisotropy;
+  loadedPBR.push({file:name,width:t.image.width,height:t.image.height});return t;
+ }
+ const [ceramicNormal,ceramicRough,plasterColor,plasterNormal,plasterRough,woodColor,woodNormal,woodRough]=await Promise.all([
+  readMap('ceramic-normal.webp'),readMap('ceramic-roughness.webp'),
+  readMap('plaster-color.webp',true,[3,3]),readMap('plaster-normal.webp',false,[3,3]),readMap('plaster-roughness.webp',false,[3,3]),
+  readMap('wood-color.webp',true),readMap('wood-normal.webp'),readMap('wood-roughness.webp')
+ ]);
+ ceramicNormal.channel=ceramicRough.channel=1;
+ const {RGBELoader}=await import('./vendor/RGBELoader.js');
+ const hdr=await new RGBELoader().loadAsync(new URL('studio-small-09.hdr',assetURL).href);
+ const pmrem=new THREE.PMREMGenerator(renderer);pmrem.compileEquirectangularShader();
+ const studio=pmrem.fromEquirectangular(hdr);scene.environment=studio.texture;
+ scene.environmentIntensity=.65;scene.environmentRotation.y=.65;hdr.dispose();pmrem.dispose();
+ const baseMat=new THREE.MeshStandardMaterial({map:plasterColor,normalMap:plasterNormal,normalScale:new THREE.Vector2(.25,.25),roughnessMap:plasterRough,roughness:1,color:'#fff9ec'});
+ const board=new THREE.Mesh(new THREE.BoxGeometry(10.5,.22,10.5),baseMat);board.position.y=-.11;board.receiveShadow=true;scene.add(board);
+ const floorMat=baseMat.clone();floorMat.color.set('#d3cabb');floorMat.normalScale.set(.15,.15);
+ for(const key of ['map','normalMap','roughnessMap']){floorMat[key]=baseMat[key].clone();floorMat[key].repeat.set(32,32);floorMat[key].needsUpdate=true;}
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(160,160),floorMat);floor.rotation.x=-Math.PI/2;floor.position.y=-.34;floor.receiveShadow=true;scene.add(floor);
+ const wood=new THREE.MeshPhysicalMaterial({map:woodColor,normalMap:woodNormal,normalScale:new THREE.Vector2(.35,.35),roughnessMap:woodRough,roughness:1,metalness:0,clearcoat:.20,clearcoatRoughness:.35});
+ // UVs align the timber grain along the separate frame rails.
+ for(let i=0;i<4;i++){
+  const railGeo=new THREE.BoxGeometry(.16,.25,10.84),a=railGeo.attributes.uv;
+  for(let j=0;j<a.count;j++)a.setXY(j,a.getX(j)*.13+(i*.21)%1,a.getY(j)*2.4);a.needsUpdate=true;
+  const m=new THREE.Mesh(railGeo,wood);if(i<2)m.rotation.y=Math.PI/2;
+  m.position.set(i<2?0:(i===2?-5.34:5.34),-.045,i<2?(i===0?-5.34:5.34):0);m.castShadow=m.receiveShadow=true;scene.add(m);
+ }
  // Thin etched underdrawing obtained by nonmaximum suppression of broad image boundaries.
  const sketch=document.createElement('canvas');sketch.width=sketch.height=N;const sc=sketch.getContext('2d'),sk=sc.createImageData(N,N),ink=new Float32Array(total);
  for(let y=4;y<N-4;y++)for(let x=4;x<N-4;x++){const i=y*N+x;ink[i]=Math.hypot(mean[i-3]-mean[i+3],mean[i-3*N]-mean[i+3*N]);}
  for(let y=5;y<N-5;y++)for(let x=5;x<N-5;x++){const i=y*N+x,dx=mean[i+3]-mean[i-3],dy=mean[i+3*N]-mean[i-3*N],step=Math.abs(dx)>Math.abs(dy)?1:N;if(ink[i]>.13&&ink[i]>=ink[i-step]&&ink[i]>=ink[i+step]){sk.data[i*4]=143;sk.data[i*4+1]=73;sk.data[i*4+2]=57;sk.data[i*4+3]=90;}}
  sc.putImageData(sk,0,0);const sketchTex=new THREE.CanvasTexture(sketch);sketchTex.colorSpace=THREE.SRGBColorSpace;const guide=new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshBasicMaterial({map:sketchTex,transparent:true,depthWrite:false,opacity:.55}));guide.rotation.x=-Math.PI/2;guide.position.y=.002;scene.add(guide);
- const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(position,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(normal,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setAttribute('color',new THREE.Float32BufferAttribute(shade,3));geo.setAttribute('aCenter',new THREE.Float32BufferAttribute(centers,4));geo.setAttribute('aMotion',new THREE.Float32BufferAttribute(motions,4));geo.computeBoundingSphere();
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(position,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(normal,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setAttribute('uv1',new THREE.Float32BufferAttribute(surfaceUV,2));geo.setAttribute('color',new THREE.Float32BufferAttribute(shade,3));geo.setAttribute('aCenter',new THREE.Float32BufferAttribute(centers,4));geo.setAttribute('aMotion',new THREE.Float32BufferAttribute(motions,4));geo.computeBoundingSphere();
  const timeUniform={value:0};const motionGLSL=`
  uniform float uTime;attribute vec4 aCenter;attribute vec4 aMotion;
  float tileProgress(){return clamp((uTime-aCenter.w)/aMotion.w,0.,1.);}
@@ -108,7 +141,24 @@ try{
  vec3 tilePosition(vec3 p){float q=tileProgress();float visible=step(aCenter.w,uTime);float f=pow(1.-q,2.);vec3 delta=vec3((aMotion.x-.5)*1.7,(.65+aMotion.y*1.45),(aMotion.z-.5)*1.5)*f;float bounce=sin(clamp((q-.78)/.22,0.,1.)*3.14159265)*.018;return aCenter.xyz+tileRotation()*(p-aCenter.xyz)*visible+delta*visible+vec3(0.,bounce-(1.-visible)*40.,0.);}
  `;
  function animateMaterial(material,hasNormals){material.onBeforeCompile=s=>{s.uniforms.uTime=timeUniform;s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\n'+motionGLSL).replace('#include <begin_vertex>','vec3 transformed=tilePosition(position);');if(hasNormals)s.vertexShader=s.vertexShader.replace('#include <beginnormal_vertex>','#include <beginnormal_vertex>\nobjectNormal=tileRotation()*objectNormal;');};material.customProgramCacheKey=()=>hasNormals?'tesserae-surface-v3':'tesserae-depth-v3';}
- const ceramic=new THREE.MeshStandardMaterial({map:texture,vertexColors:true,roughness:.83,metalness:0,bumpMap:sandMap,bumpScale:.004});animateMaterial(ceramic,true);const mesh=new THREE.Mesh(geo,ceramic);mesh.frustumCulled=false;mesh.castShadow=mesh.receiveShadow=true;const depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});animateMaterial(depth,false);mesh.customDepthMaterial=depth;scene.add(mesh);
+ // Mild impulse-noise removal only: retain all broad outlines and source colours.
+ const cleanCanvas=document.createElement('canvas');cleanCanvas.width=cleanCanvas.height=N;
+ const cleanContext=cleanCanvas.getContext('2d'),cleanPixels=cleanContext.createImageData(N,N);
+ const samples=new Array(9);
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+  const i=(y*N+x)*4;
+  for(let channel=0;channel<3;channel++){
+   let n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+    const yy=Math.max(0,Math.min(N-1,y+dy)),xx=Math.max(0,Math.min(N-1,x+dx));
+    samples[n++]=rgba[(yy*N+xx)*4+channel];
+   }
+   samples.sort((a,b)=>a-b);cleanPixels.data[i+channel]=rgba[i+channel]*.35+samples[4]*.65;
+  }
+  cleanPixels.data[i+3]=255;
+ }
+ cleanContext.putImageData(cleanPixels,0,0);
+ const glazeArtwork=new THREE.CanvasTexture(cleanCanvas);glazeArtwork.colorSpace=THREE.SRGBColorSpace;glazeArtwork.anisotropy=anisotropy;
+ const ceramic=new THREE.MeshPhysicalMaterial({map:glazeArtwork,vertexColors:true,normalMap:ceramicNormal,normalScale:new THREE.Vector2(.25,.25),roughnessMap:ceramicRough,roughness:1,metalness:0,ior:1.48,clearcoat:.8,clearcoatRoughness:.15,clearcoatNormalMap:ceramicNormal,clearcoatNormalScale:new THREE.Vector2(.10,.10),envMapIntensity:1.1});animateMaterial(ceramic,true);const mesh=new THREE.Mesh(geo,ceramic);mesh.frustumCulled=false;mesh.castShadow=mesh.receiveShadow=true;const depth=new THREE.MeshDepthMaterial({depthPacking:THREE.RGBADepthPacking});animateMaterial(depth,false);mesh.customDepthMaterial=depth;scene.add(mesh);
  // Depth-aware lens blur outside the macro shot focus plane.
  const target=new THREE.WebGLRenderTarget(1,1,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,depthBuffer:true,samples:2});
  target.texture.colorSpace=THREE.LinearSRGBColorSpace;target.depthTexture=new THREE.DepthTexture(1,1,THREE.UnsignedIntType);
@@ -143,7 +193,7 @@ try{
  addEventListener('resize',resize);resize();
  function updateUI(){timeline.value=String(clock);$('#time').textContent=clock.toFixed(1).padStart(4,'0');play.textContent=playing?'暂停':'播放';play.setAttribute('aria-label',playing?'暂停':'播放');$('#status').textContent=clock>=23?'三维成品 · 可旋转':clock<6.5?'01 / 边框':clock<12?'02 / 机器人':clock<17.4?'03 / 荷塘':clock<21?'04 / 眼睛细节':'05 / 全景';}
  function render(){dirty=false;timeUniform.value=clock;shot(clock);lens.uniforms.uFocus.value=camera.position.distanceTo(tmpT);lens.uniforms.uAmount.value=Math.max(1-THREE.MathUtils.smoothstep(clock,2.4,4),THREE.MathUtils.smoothstep(clock,16.8,18)*(1-THREE.MathUtils.smoothstep(clock,20.5,22.5)));renderer.setRenderTarget(target);renderer.render(scene,camera);renderer.setRenderTarget(null);renderer.render(postScene,postCamera);updateUI();frames++;}
- window.__mosaicTest={seek(t){clock=THREE.MathUtils.clamp(t,0,24);playing=false;render();},stats(){return{build:'mosaic-three-r2',ready,revision:THREE.REVISION,tileCount:tiles.length,triangles:geo.attributes.position.count/3,time:clock,frames,drawCalls:renderer.info.render.calls,canvas:[renderer.domElement.width,renderer.domElement.height],webgl2:renderer.capabilities.isWebGL2};},resetCamera(){yaw=pitch=0;zoom=1;render();}};
+ window.__mosaicTest={seek(t){clock=THREE.MathUtils.clamp(t,0,24);playing=false;render();},stats(){return{build:'mosaic-pbr-r3',artworkCleanup:'contour-preserving-median',materials:{type:ceramic.type,clearcoat:ceramic.clearcoat,roughness:ceramic.roughness,normalScale:ceramic.normalScale.x,environment:Boolean(scene.environment),maps:loadedPBR},ready,revision:THREE.REVISION,tileCount:tiles.length,triangles:geo.attributes.position.count/3,time:clock,frames,drawCalls:renderer.info.render.calls,canvas:[renderer.domElement.width,renderer.domElement.height],webgl2:renderer.capabilities.isWebGL2};},resetCamera(){yaw=pitch=0;zoom=1;render();}};
  render();ready=true;loading.classList.add('done');setTimeout(()=>loading.style.display='none',600);
  if(matchMedia('(prefers-reduced-motion: reduce)').matches){clock=24;playing=false;render();}
  play.onclick=()=>{if(clock>=24)clock=0;playing=!playing;last=performance.now();updateUI();};$('#replay').onclick=()=>{clock=0;playing=true;yaw=pitch=0;zoom=1;last=performance.now();};$('#finish').onclick=()=>{clock=24;playing=false;yaw=pitch=0;zoom=1;render();};timeline.addEventListener('input',()=>{clock=Number(timeline.value);playing=false;render();});

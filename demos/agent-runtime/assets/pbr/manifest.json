@@ -1,0 +1,149 @@
+{
+  "version": "pbr-r3",
+  "sources": [
+    {
+      "file": "Tiles107_4K-JPG.zip",
+      "url": "https://ambientcg.com/get?file=Tiles107_4K-JPG.zip",
+      "source": "https://ambientcg.com/view?id=Tiles107",
+      "license": "CC0-1.0",
+      "bytes": 18750200,
+      "sha256": "d33eb396c7529b30bc50a16d8f69800297681a053582f1aa4681ecdd700ea0e0"
+    },
+    {
+      "file": "beige_wall_001_diff.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_diff_2k.jpg",
+      "source": "https://polyhaven.com/a/beige_wall_001",
+      "license": "CC0-1.0",
+      "bytes": 235868,
+      "sha256": "222d4d2e7d5c425c97e5a66790852388cec7706714d773f769fba6bfe08cea4e"
+    },
+    {
+      "file": "beige_wall_001_nor_gl.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_nor_gl_2k.jpg",
+      "source": "https://polyhaven.com/a/beige_wall_001",
+      "license": "CC0-1.0",
+      "bytes": 815507,
+      "sha256": "7f5cbecd6766f44034f3b78b4addb1559e12bdd5a77501bd418a736609e7cedc"
+    },
+    {
+      "file": "beige_wall_001_rough.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/beige_wall_001/beige_wall_001_rough_2k.jpg",
+      "source": "https://polyhaven.com/a/beige_wall_001",
+      "license": "CC0-1.0",
+      "bytes": 656368,
+      "sha256": "a76e2307d8ec47d1be1d4710851fc4545db7aecfa176333738a6756358b64767"
+    },
+    {
+      "file": "wood_table_001_diff.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_diff_2k.jpg",
+      "source": "https://polyhaven.com/a/wood_table_001",
+      "license": "CC0-1.0",
+      "bytes": 924532,
+      "sha256": "63ae5cd186197b40f18bc020fe2b652bb08df4d9fc6240c6cbf8a7e3bc32c096"
+    },
+    {
+      "file": "wood_table_001_nor_gl.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_nor_gl_2k.jpg",
+      "source": "https://polyhaven.com/a/wood_table_001",
+      "license": "CC0-1.0",
+      "bytes": 385020,
+      "sha256": "d56f02c911391267ddc6adc92e8a5bc29b9803196e8d57ad5b9702e6c842dc28"
+    },
+    {
+      "file": "wood_table_001_rough.jpg",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/wood_table_001/wood_table_001_rough_2k.jpg",
+      "source": "https://polyhaven.com/a/wood_table_001",
+      "license": "CC0-1.0",
+      "bytes": 963377,
+      "sha256": "c788876d80e4d96598590631f8de92447fb1b0ba1265a812514ee717d270ac3e"
+    },
+    {
+      "file": "studio_small_09_1k.hdr",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr",
+      "source": "https://polyhaven.com/a/studio_small_09",
+      "license": "CC0-1.0",
+      "bytes": 1615248,
+      "sha256": "e7cfda5f4e98e623db12b8bfd0184e048488e4855d9c83e2751fb44a32e80c45"
+    }
+  ],
+  "assets": [
+    {
+      "file": "ceramic-normal.webp",
+      "bytes": 13904,
+      "sha256": "e3428d72a5c2c0c0499147297277f879d8449ca7ba1080afb78e3801a82ee477",
+      "dimensions": [
+        448,
+        448
+      ]
+    },
+    {
+      "file": "ceramic-roughness.webp",
+      "bytes": 7064,
+      "sha256": "a98e123d0ed5f64b1113419ac1cc1f4ccee81123a50a9bc3bf9e43675abab8ba",
+      "dimensions": [
+        448,
+        448
+      ]
+    },
+    {
+      "file": "plaster-color.webp",
+      "bytes": 92212,
+      "sha256": "8f3678995ae7021791ec3d04b9fee032a90d3829852a2846dd41341bc3fccd53",
+      "dimensions": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "file": "plaster-normal.webp",
+      "bytes": 361556,
+      "sha256": "62095bc8e66026e5994f050c7ae1efb1c3c422a4c6120fb1555da41948303b90",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "file": "plaster-roughness.webp",
+      "bytes": 47948,
+      "sha256": "d515565942929e9359f8c45671c3858212b9c53604be1387a21659b4a872d84b",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "file": "studio-small-09.hdr",
+      "bytes": 1615248,
+      "sha256": "e7cfda5f4e98e623db12b8bfd0184e048488e4855d9c83e2751fb44a32e80c45"
+    },
+    {
+      "file": "wood-color.webp",
+      "bytes": 224152,
+      "sha256": "824e930d47ce31bcab6894a6b8d35592871c89759fc4d8b6d35385696c8417c9",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "file": "wood-normal.webp",
+      "bytes": 79440,
+      "sha256": "f7a0effdf746237e29a13f887c652921fc67f2d41e61fe7b16d81ddd1e0fa007",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    },
+    {
+      "file": "wood-roughness.webp",
+      "bytes": 185382,
+      "sha256": "8803ab83de4ee12b3f213e6c143d6cd24a79ceb377f164612f9c1dcd135682ad",
+      "dimensions": [
+        1024,
+        1024
+      ]
+    }
+  ],
+  "downloadBytes": 2626906
+}
